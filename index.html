@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Indonesia dalam data</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+    <!-- React + ReactDOM via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        :root {
+            --toolbar-bg: rgba(255, 255, 255, 0.9);
+            --toolbar-border: rgba(0, 0, 0, 0.12);
+            --active-bg: #f3f4f6;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        #root {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #mainChart {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Toolbar tombol DOM */
+        .toolbar {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            display: inline-flex;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 12px;
+            background: var(--toolbar-bg);
+            border: 1px solid var(--toolbar-border);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            z-index: 10;
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+        }
+
+        .toolbtn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font: inherit;
+            font-size: 18px;
+            line-height: 1;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: white;
+            border: 1px solid var(--toolbar-border);
+            cursor: pointer;
+            user-select: none;
+            transition: transform 120ms ease, background 120ms ease;
+        }
+
+        .toolbtn:hover {
+            transform: translateY(-1px);
+        }
+
+        .toolbtn:active {
+            transform: translateY(0);
+        }
+
+        .toolbtn.active {
+            background: var(--active-bg);
+        }
+
+        .toolbtn span.label {
+            margin-left: 6px;
+            font-size: 12px;
+            color: #374151;
+        }
+
+        /* Responsif kecil: sembunyikan label teks, hanya ikon */
+        @media (max-width: 520px) {
+            .toolbtn span.label {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Toolbar DOM (bukan React) -->
+    <div class="toolbar" aria-label="Chart Controls">
+        <button id="btnMap" class="toolbtn" aria-pressed="true" title="Tampilkan Peta">
+            <span role="img" aria-label="Globe">🌐</span>
+            <span class="label">Map</span>
+        </button>
+        <button id="btnBar" class="toolbtn" aria-pressed="false" title="Tampilkan Bar Chart">
+            <span role="img" aria-label="Bar Chart">📊</span>
+            <span class="label">Bar</span>
+        </button>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useEffect, useRef, useState } = React;
+
+        const MyChartComponent = () => {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            const mapOptionRef = useRef(null);
+            const barOptionRef = useRef(null);
+            const dataRef = useRef([]);
+            const [mode, setMode] = useState('map'); // 'map' | 'bar'
+
+            // Helper: set tombol aktif/nonaktif di DOM
+            const updateToolbarActive = (nextMode) => {
+                const btnMap = document.getElementById('btnMap');
+                const btnBar = document.getElementById('btnBar');
+                if (!btnMap || !btnBar) return;
+
+                const mapActive = nextMode === 'map';
+                btnMap.classList.toggle('active', mapActive);
+                btnBar.classList.toggle('active', !mapActive);
+
+                btnMap.setAttribute('aria-pressed', String(mapActive));
+                btnBar.setAttribute('aria-pressed', String(!mapActive));
+            };
+
+            // Init chart & fetch GeoJSON
+            useEffect(() => {
+                let isMounted = true;
+
+                const fetchData = async () => {
+                    try {
+                        const response = await fetch('./lampung-regency.geojson');
+                        const geoJson = await response.json();
+
+                        if (!isMounted) return;
+
+                        echarts.registerMap('Lampung', geoJson);
+                        console.log(geoJson);
+
+                        const kemenagData = [
+                            { id: "fc343ef9-7900-4c1b-a943-e32ba1506a5b", name: "Kantor Kemenag Kabupaten Lampung Barat", kecamatan: 15, kelurahan: 136, luasWilayah: 2126.03 },
+                            { id: "2ee53ebd-5047-4bb9-8c42-d15831144d9d", name: "Kantor Kemenag Kabupaten Lampung Selatan", kecamatan: 17, kelurahan: 260, luasWilayah: 2219.53 },
+                            { id: "bb75986b-78fc-4892-93d3-65c39de27548", name: "Kantor Kemenag Kabupaten Lampung Tengah", kecamatan: 28, kelurahan: 311, luasWilayah: 4.544 },
+                            { id: "23492f63-6f5c-49ce-9ef5-43ba5c21a958", name: "Kantor Kemenag Kabupaten Lampung Timur", kecamatan: 24, kelurahan: 264, luasWilayah: 3865.27 },
+                            { id: "b391e6c6-24c9-4c6b-99a6-ccf5701b6efd", name: "Kantor Kemenag Kabupaten Lampung Utara", kecamatan: 23, kelurahan: 247, luasWilayah: 2529.54 },
+                            { id: "9df10814-7257-41d4-8f6b-858242825950", name: "Kantor Kemenag Kabupaten Tanggamus", kecamatan: 20, kelurahan: 302, luasWilayah: 2902.71 },
+                            { id: "990ceab2-00b2-4266-824c-c1f9c3fd2023", name: "Kantor Kemenag Kabupaten Tulang Bawang", kecamatan: 15, kelurahan: 151, luasWilayah: 3130.74 },
+                            { id: "43256d9a-cd11-4bab-a7e3-2050df03f359", name: "Kantor Kemenag Kabupaten Way Kanan", kecamatan: 15, kelurahan: 227, luasWilayah: 3660.71 },
+                            { id: "d14fb57c-f1a6-4f3c-89ce-657d304b6e9f", name: "Kantor Kemenag Kabupaten Pesawaran", kecamatan: 11, kelurahan: 148, luasWilayah: 1279.11 },
+                            { id: "4a2b2f39-2d2d-46f1-baf1-442cb1f8a1d2", name: "Kantor Kemenag Kabupaten Tulang Bawang Barat", kecamatan: 9, kelurahan: 103, luasWilayah: 1247.59 },
+                            { id: "7f061942-afa6-4e93-986c-484933628d00", name: "Kantor Kemenag Kabupaten Mesuji", kecamatan: 7, kelurahan: 105, luasWilayah: 2205.77 },
+                            { id: "8e11bf04-c9ff-4537-a6cf-4bdec27e09ce", name: "Kantor Kemenag Kabupaten Pringsewu", kecamatan: 9, kelurahan: 131, luasWilayah: 614.48 },
+                            { id: "1f6c142b-5109-448a-b27b-301befeff934", name: "Kantor Kemenag Kabupaten Pesisir Barat", kecamatan: 11, kelurahan: 118, luasWilayah: 3046.13 },
+                            { id: "d40ee523-c5e7-4c71-9da6-01b8dd045b1c", name: "Kantor Kemenag Kota Bandar Lampung", kecamatan: 20, kelurahan: 126, luasWilayah: 118.26 },
+                            { id: "72761508-e035-42b1-ad08-9a207117508e", name: "Kantor Kemenag Kota Metro", kecamatan: 5, kelurahan: 22, luasWilayah: 73.15 }
+                        ]  
+                        const data = geoJson?.features?.map((feature) => {
+                            const matched = kemenagData.find((item) => item.id === feature?.properties?.uuid);
+                            console.log(matched);
+                            
+                            return {
+                                name: feature?.properties?.alt_name,
+                                // value: matched?.luasWilayah ?? Math.floor(Math.random() * (10000000 - 10000 + 1)) + 10000,
+                                id: feature?.properties?.uuid,
+                                kecamatan: matched?.kecamatan,
+                                kelurahan: matched?.kelurahan,
+                                value: matched?.luasWilayah,
+                                keterangan: matched?.name,
+                            };
+                        }) ?? [];
+                        console.log(data)
+
+                        // Urutkan data untuk bar chart (yAxis kategori berurutan)
+                        data.sort((a, b) => a.value - b.value);
+                        dataRef.current = data;
+
+                        const mapOption = {
+                            visualMap: {
+                                min: 0,
+                                max: 4000, // Atur sesuai dengan data maksimum luas wilayah
+                                text: ['Luas Wilayah Terbesar', 'Terkecil'],
+                                realtime: true,
+                                calculable: true,
+                                inRange: {
+                                    color: ['#e5f5e0', '#a1d99b', '#74c476', '#31a354', '#006d2c'] // gradasi hijau
+                                },
+                                formatter: (value) => `${value} km²`,
+                                left: 'right',
+                                bottom: '10%',
+                            },
+                            title: {
+                                text: 'Jumlah Penduduk Lampung',
+                                subtext: 'Sumber ngalor ngidul',
+                                left: 'right',
+                            },
+                            tooltip: { trigger: 'item' },
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: function (params) {
+                                    const { data } = params;
+                                    if (!data) return params.name;
+                                    return `
+                                        <strong>${data.keterangan ?? params.name}</strong><br/>
+                                        Kecamatan: ${data.kecamatan ?? '-'}<br/>
+                                        Kelurahan: ${data.kelurahan ?? '-'}<br/>
+                                        Luas Wilayah: ${data.value ?? '-'} km²
+                                    `;
+                                }
+                            },
+
+                            series: [
+                                {
+                                    name: 'Luas Wilayah (km²)',
+                                    type: 'map',
+                                    map: 'Lampung',
+                                    roam: true,
+                                    nameProperty: 'alt_name',
+                                    data, // gunakan array yang sudah berisi luasWilayah sebagai value
+                                    emphasis: {
+                                        label: {
+                                            show: true
+                                        }
+                                    }
+                                }
+                            ]
+                        };
+
+                        const barOption = {
+                            tooltip: {
+                                trigger: 'axis',
+                                axisPointer: { type: 'shadow' },
+                            },
+                            yAxis: { type: 'value' },
+                            xAxis: {
+                                type: 'category',
+                                axisLabel: {
+                                    rotate: 45,       // Lebih miring agar tidak saling tumpuk
+                                    interval: 0,      // Tampilkan semua label
+                                    fontSize: 10,
+                                    margin: 12,       // Jarak dari sumbu X
+                                },
+                                data: data.map((item) => item.name),
+                            },
+
+                        
+                            animationDurationUpdate: 600,
+                            series: [
+                                {
+                                    type: 'bar',
+                                    data: data.map((item) => item.value),
+                                    id: 'population',
+                                    universalTransition: true,
+                                    itemStyle: {
+                                        color: '#4CAF50' // Warna batang (hijau)
+                                    }
+                                },
+                            ],
+                            title: {
+                                text: 'Jumlah Penduduk Lampung',
+                                subtext: 'Sumber ngalor ngidul',
+                                left: 'right',
+                            },
+                        };
+
+                        mapOptionRef.current = mapOption;
+                        barOptionRef.current = barOption;
+
+                        // Init ECharts
+                        chartInstance.current = echarts.init(chartRef.current);
+                        chartInstance.current.setOption(mapOptionRef.current);
+
+                        // Responsif
+                        const resize = () => chartInstance.current && chartInstance.current.resize();
+                        window.addEventListener('resize', resize);
+
+                        return () => {
+                            window.removeEventListener('resize', resize);
+                        };
+                    } catch (err) {
+                        console.error('Error loading map data:', err);
+                    }
+                };
+
+                fetchData();
+
+                return () => { isMounted = false; };
+            }, []);
+
+            // Dengarkan klik tombol DOM untuk mengubah mode
+            useEffect(() => {
+                const btnMap = document.getElementById('btnMap');
+                const btnBar = document.getElementById('btnBar');
+                if (!btnMap || !btnBar) return;
+
+                const onMap = () => setMode('map');
+                const onBar = () => setMode('bar');
+
+                btnMap.addEventListener('click', onMap);
+                btnBar.addEventListener('click', onBar);
+
+                return () => {
+                    btnMap.removeEventListener('click', onMap);
+                    btnBar.removeEventListener('click', onBar);
+                };
+            }, []);
+
+            // Terapkan perubahan option saat mode berubah
+            useEffect(() => {
+                updateToolbarActive(mode);
+                const chart = chartInstance.current;
+                if (!chart) return;
+
+                if (mode === 'map' && mapOptionRef.current) {
+                    chart.setOption(mapOptionRef.current, true);
+                } else if (mode === 'bar' && barOptionRef.current) {
+                    chart.setOption(barOptionRef.current, true);
+                }
+            }, [mode]);
+
+            return <div id="mainChart" ref={chartRef}></div>;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MyChartComponent />);
+    </script>
+</body>
+
+</html>
